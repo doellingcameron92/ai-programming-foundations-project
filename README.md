@@ -31,7 +31,7 @@ Source: https://archive.ics.uci.edu/dataset/186/wine+quality
 Requires Python 3.9 or newer.
 
 ```bash
-git clone https://github.com/<your-username>/ai-programming-foundations-project.git
+git clone https://github.com/doellingcameron92/ai-programming-foundations-project.git
 cd ai-programming-foundations-project
 
 python -m venv .venv
