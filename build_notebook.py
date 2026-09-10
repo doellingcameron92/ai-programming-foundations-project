@@ -55,7 +55,7 @@ print("seaborn", sns.__version__)
 """)
 
 md("""
-## 2. Load the dataset
+## 2. Data ingestion
 
 The CSV lives next to this notebook and is committed to the repository, so the workflow runs
 without a network connection and every rerun reads exactly the same bytes.
@@ -218,7 +218,26 @@ def flag_extreme_values(data, columns=None, z_threshold=5.0):
 """)
 
 md("""
-### Apply the cleaning pipeline
+### Why these cleaning steps were necessary
+
+The audit above surfaced three concrete problems, and each cleaning function addresses one of them.
+
+**Inconsistent naming.** The column labels arrive in mixed case (`pH` alongside `alcohol`), and the
+`color` values are free text. Any grouping or column lookup that assumes one convention breaks
+silently on the other — `groupby("color")` would treat `'Red'` and `'red'` as two separate wines
+styles — so `standardize_columns()` forces a single lowercase, underscore-separated convention
+before anything else touches the data.
+
+**Duplicate records.** 1,177 of the 6,497 rows are exact copies of another row. Duplicates add no
+information about wine chemistry, but they do pull every mean, correlation and plot toward whichever
+wine profiles happen to repeat. Left in place they would have inflated the sample size by 18% and
+biased every result below, so `remove_duplicate_records()` keeps only the first occurrence.
+
+**Unverified completeness and extreme values.** A workflow cannot assume a file is complete just
+because it looks tidy, so `handle_missing_values()` checks and reports rather than trusting the
+source; here it confirmed there are no gaps to impute. `flag_extreme_values()` then marks the rows
+with measurements beyond five standard deviations, which keeps unusual-but-real wines in the sample
+while making them easy to exclude from any later sensitivity check.
 
 The steps run in a fixed order — names first, then duplicates, then missing values, then the
 outlier flag — so the output is a deterministic function of the raw CSV.
@@ -354,6 +373,13 @@ plt.show()
 """)
 
 md("""
+**Interpretation of Figure 1.** The target variable is severely imbalanced. Scores of 5 and 6
+account for 4,075 of the 5,320 cleaned wines (77%), while the two extremes together — 30 wines
+scored 3 and 5 scored 9 — make up less than 1%. White wines outnumber red roughly three to one at
+every score. Two consequences follow for the rest of the analysis: any claim about excellent or
+poor wines rests on a handful of observations, and any statistic pooled across both colours is
+effectively a statistic about white wine.
+
 **Figure 2 — How the chemical measurements relate to each other.** A correlation heatmap shows
 both which variables track quality and which variables duplicate each other, which matters for
 any modelling that follows this workflow.
@@ -376,6 +402,14 @@ plt.show()
 """)
 
 md("""
+**Interpretation of Figure 2.** Reading the bottom `quality` row, alcohol is the strongest positive
+correlate (r = 0.47) and density (-0.33) and volatile acidity (-0.27) the strongest negative ones;
+everything else sits within ±0.2 of zero, including citric acid and residual sugar. The rest of the
+matrix shows heavy redundancy among the predictors themselves: density moves with residual sugar
+(0.52) and against alcohol (-0.67), and free and total sulphur dioxide correlate at 0.72. Density's
+negative link to quality is therefore largely alcohol's relationship restated, and a later model
+would gain little from carrying all of these measurements at once.
+
 **Figure 3 — The strongest single relationship.** Alcohol has the largest positive correlation
 with quality, so a boxplot per quality score shows whether that relationship is a steady trend or
 an artefact of the sparsely populated extreme scores.
@@ -396,6 +430,14 @@ plt.show()
 """)
 
 md("""
+**Interpretation of Figure 3.** The relationship is a genuine trend, not an artefact of the sparse
+tails: median alcohol climbs steadily from 9.6% at score 5 to 10.5%, 11.5% and 12.2% at scores 6, 7
+and 8.
+The boxes also overlap heavily, so alcohol separates the groups on average without predicting any
+individual wine's score, and the widest boxes sit at the extreme scores where only a few dozen
+wines exist. Note that the trend is flat or slightly reversed between scores 3, 4 and 5, so this is
+not a strictly monotonic relationship across the whole scale.
+
 **Figure 4 — Two drivers at once.** Volatile acidity is among the strongest negative correlates of
 quality; plotting it against alcohol shows how the two combine, separately for red and white wine.
 """)
@@ -413,6 +455,16 @@ fig.colorbar(points, ax=axes, label="Quality score")
 fig.suptitle("Figure 4: Higher alcohol and lower volatile acidity accompany better scores")
 fig.savefig("figures/figure4_alcohol_vs_volatile_acidity.png", dpi=150, bbox_inches="tight")
 plt.show()
+""")
+
+md("""
+**Interpretation of Figure 4.** Red and white wines occupy visibly different regions: reds spread
+across volatile acidity from 0.12 to 1.58 g/dm3, while whites cluster tightly below 0.5. Within each
+panel the brighter (higher-scoring) points concentrate toward the lower right — more alcohol, less
+volatile acidity — which is the two-variable version of the pattern Figures 2 and 3 showed one
+variable at a time. The effect is clearer in reds; among whites, colour varies mostly along the
+alcohol axis, suggesting volatile acidity matters less for white wine at the low levels it reaches
+there.
 """)
 
 md("""
